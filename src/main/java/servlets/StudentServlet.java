@@ -24,7 +24,7 @@ public class StudentServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private static final Logger logger = Logger.getLogger(StudentServlet.class.getName());
 
-    private static final String JDBC_URL = "jdbc:postgresql://host.docker.internal:5432/uni";
+    private static final String JDBC_URL = "jdbc:postgresql://localhost:5432/uni";
     private static final String JDBC_USER = "postgres";
     private static final String JDBC_PASSWORD = "000000";
 
