@@ -1,10 +1,13 @@
 package servlets;
 
+import logging.CustomFormatter;
+
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Connection;
@@ -16,7 +19,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.FileHandler;
 import java.util.logging.Level;
+import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 @WebServlet({"/student", "/data", "/update", "/delete"})
@@ -32,15 +38,44 @@ public class StudentServlet extends HttpServlet {
     public void init() throws ServletException {
         super.init();
         try {
+            // Load the logging configuration from the properties file
+            LogManager.getLogManager().readConfiguration(
+                    getClass().getClassLoader().getResourceAsStream("logging.properties"));
+
+            // Set up log directory if it doesn't exist
+            File logDir = new File("logs");
+            if (!logDir.exists()) {
+                logDir.mkdirs();
+            }
+
+            // Set up console handler
+            ConsoleHandler consoleHandler = new ConsoleHandler();
+            consoleHandler.setLevel(Level.INFO);
+            consoleHandler.setFormatter(new CustomFormatter());
+
+            // Set up file handler with log rotation
+            FileHandler fileHandler = new FileHandler("logs/application.log", 50000, 5, true);
+            fileHandler.setLevel(Level.INFO);
+            fileHandler.setFormatter(new CustomFormatter());
+
+            // Add handlers to root logger
+            Logger rootLogger = Logger.getLogger("");
+            rootLogger.addHandler(consoleHandler);
+            rootLogger.addHandler(fileHandler);
+
+            // Load PostgreSQL JDBC driver
             Class.forName("org.postgresql.Driver");
-        } catch (ClassNotFoundException e) {
-            throw new ServletException("PostgreSQL JDBC Driver not found", e);
+
+        } catch (ClassNotFoundException | IOException e) {
+            logger.log(Level.SEVERE, "Initialization error", e);
+            throw new ServletException("Initialization error", e);
         }
     }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        logger.info("Received GET request for path: " + request.getServletPath());
         String path = request.getServletPath();
         if ("/data".equals(path)) {
             List<Map<String, String>> students = new ArrayList<>();
@@ -54,6 +89,7 @@ public class StudentServlet extends HttpServlet {
                     student.put("address", rs.getString("address"));
                     students.add(student);
                 }
+                logger.info("Successfully retrieved student data.");
             } catch (SQLException e) {
                 logger.log(Level.SEVERE, "Error retrieving students data", e);
                 throw new ServletException("Error retrieving students data", e);
@@ -65,6 +101,11 @@ public class StudentServlet extends HttpServlet {
             PrintWriter out = response.getWriter();
             out.println("<a href='index.jsp'>Back to form</a>");
             out.close();
+        }
+        if ("/data".equals(request.getServletPath())) {
+            logger.info("Fetching student data");
+        } else {
+            logger.warning("Unhandled GET request path: " + request.getServletPath());
         }
     }
 
@@ -83,6 +124,7 @@ public class StudentServlet extends HttpServlet {
                 stmt.setString(1, name);
                 stmt.setString(2, address);
                 stmt.executeUpdate();
+                logger.info("Inserted student: " + name);
 
             } catch (SQLException e) {
                 logger.log(Level.SEVERE, "Error inserting student", e);
@@ -102,6 +144,7 @@ public class StudentServlet extends HttpServlet {
                 stmt.setString(2, address);
                 stmt.setString(3, oldName);
                 stmt.executeUpdate();
+                logger.info("Updated student: " + oldName + " to " + name);
 
             } catch (SQLException e) {
                 logger.log(Level.SEVERE, "Error updating student", e);
@@ -117,6 +160,7 @@ public class StudentServlet extends HttpServlet {
 
                 stmt.setString(1, name);
                 stmt.executeUpdate();
+                logger.info("Deleted student: " + name);
 
             } catch (SQLException e) {
                 logger.log(Level.SEVERE, "Error deleting student", e);
